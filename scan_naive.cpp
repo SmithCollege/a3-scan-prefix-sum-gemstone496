@@ -11,21 +11,19 @@ int main() {
   // initialize inputs
   for (int i = 0; i < SIZE; i++) {
     input[i] = 1;
-   }
+  }
 
   // do the scan
+  int value = 0;
   for (int i = 0; i < SIZE; i++) {
-   int value = 0;
-   for (int j = 0; j <= i; j++) {
-     value += input[j];
-   }
+    value += input[i];
     output[i] = value;
   }
 
   // check results
   for (int i = 0; i < SIZE; i++) {
-    int ans = (i+1)*(i+2) / 2;
-    output[i] == ans ? printf("%d ", output[i]) : printf("\n  IDX: %d   OUT: %d\n", i, output[i]);
+    int ans = i+1;
+    output[i] == ans ? printf("%d ", output[i]) : printf("\n  IDX: %d   OUT: %d\n   EXP: %d", i, output[i], ans);
   }
   printf("\n");
 
