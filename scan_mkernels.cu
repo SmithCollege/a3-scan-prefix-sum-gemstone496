@@ -17,10 +17,12 @@ __global__ void scan_range(int *in, int *out, int *sums){
     out[i] = sum;
   }
 
-  int sumsLen = (SIZE+RANGE-1)/RANGE; // add in appropriate sums
-  for (int i = gindex+1; i < sumsLen; i++){
-    sums[gindex] += sum;
-  }
+  int sumsLen = (SIZE+RANGE-1)/RANGE; // length of sums, so we don't edit oob
+  ++gindex < sumsLen ? sums[gindex] += sum : sums[gindex] = 0; // it's ok it'll work i pwomise
+    //printf("idx: %d   sum: %d   \n", gindex, sum);
+    //for (++gindex; gindex < sumsLen; gindex++){
+    //sums[gindex] += sum;
+    //}
 }
 
 __global__ void scan_final(int *out, int *sums){
@@ -32,15 +34,17 @@ __global__ void scan_final(int *out, int *sums){
 
 int main() {
   // allocate input and output arrays
+  int sumsLen = (SIZE+RANGE-1)/RANGE; //ceiling of SIZE/RANGE
   int *in; cudaMallocManaged(&in, SIZE*sizeof(int)); //these belong on the same lines bc they're var assignment:
   int *out; cudaMallocManaged(&out, SIZE*sizeof(int)); //on a technicality, the statements must be separated.
-  int *sums; cudaMallocManaged(&sums, (SIZE+RANGE-1)/RANGE *sizeof(int)); //ceiling of SIZE/RANGE
+  int *sums; cudaMallocManaged(&sums, sumsLen*sizeof(int)); 
+  
   
   // initialize inputs
   for (int i = 0; i < SIZE; i++) {
     in[i] = 1;
   }
-  for (int i = 0; i < (SIZE+RANGE-1)/RANGE; i++) {
+  for (int i = 0; i < sumsLen; i++) {
     sums[i] = 0;
   }
 
@@ -48,6 +52,13 @@ int main() {
   int numBlocks = (SIZE + BLOCK_SIZE*RANGE - 1) / (BLOCK_SIZE*RANGE);
   scan_range<<< numBlocks, BLOCK_SIZE >>>(in, out, sums);
   cudaDeviceSynchronize(); // patience, girls
+
+  int cSum = 0;
+  for (int i = 1; i < sumsLen; i++) {
+    sums[i] += cSum;
+    cSum = sums[i];
+  }
+  
   scan_final<<< numBlocks, BLOCK_SIZE*RANGE >>>(out, sums);
   cudaDeviceSynchronize(); // remain patient
 
