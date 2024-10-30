@@ -1,7 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <chrono>
+#include <iostream>
 
-#define SIZE 128
+#define SIZE 2048
+#define RUNS 100
 
 int main() {
   // allocate memory
@@ -13,19 +16,26 @@ int main() {
     input[i] = 1;
   }
 
-  // do the scan
-  int value = 0;
-  for (int i = 0; i < SIZE; i++) {
-    value += input[i];
-    output[i] = value;
+  for (int i = 0; i < RUNS; i++) {
+    const auto start{std::chrono::steady_clock::now()};
+
+    // do the scan
+    int value = 0;
+    for (int i = 0; i < SIZE; i++) {
+      value += input[i];
+      output[i] = value;
+    }
+    
+    const auto end{std::chrono::steady_clock::now()};
+    const std::chrono::duration<double> elapsed{end - start};
+    std::cout << elapsed.count() << "\n";
   }
 
   // check results
   for (int i = 0; i < SIZE; i++) {
     int ans = i+1;
-    output[i] == ans ? printf("%d ", output[i]) : printf("\n  IDX: %d   OUT: %d\n   EXP: %d", i, output[i], ans);
+    if (output[i] != ans) { std::cerr << "IDX: " << i << "   OUT: " << output[i] << "   EXP: " << ans << std::endl; }
   }
-  printf("\n");
 
   // free mem
   free(input);

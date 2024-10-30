@@ -1,9 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <chrono>
+#include <iostream>
 
-#define SIZE 512
-#define BLOCK_SIZE 64
-#define RANGE 4
+#define SIZE 2048
+#define BLOCK_SIZE 128
+#define RANGE 16
+#define RUNS 100
 
 // function to calculate the scan on GPU
 __global__ void scan_range(int *in, int *out, int *sums){
@@ -35,9 +38,10 @@ __global__ void scan_final(int *out, int *sums){
 int main() {
   // allocate input and output arrays
   int sumsLen = (SIZE+RANGE-1)/RANGE; //ceiling of SIZE/RANGE
+  int numBlocks = (SIZE + BLOCK_SIZE*RANGE - 1) / (BLOCK_SIZE*RANGE);
   int *in; cudaMallocManaged(&in, SIZE*sizeof(int)); //these belong on the same lines bc they're var assignment:
   int *out; cudaMallocManaged(&out, SIZE*sizeof(int)); //on a technicality, the statements must be separated.
-  int *sums; cudaMallocManaged(&sums, sumsLen*sizeof(int)); 
+  int *sums; cudaMallocManaged(&sums, sumsLen*sizeof(int));
   
   
   // initialize inputs
@@ -48,8 +52,25 @@ int main() {
     sums[i] = 0;
   }
 
+  for (int i = 0; i < RUNS; i++) {
+    int cSum = 0;
+    const auto start{std::chrono::steady_clock::now()};
+    
+    scan_range<<< numBlocks, BLOCK_SIZE >>>(in, out, sums);
+    cudaDeviceSynchronize(); // patience, girls
+    for (int i = 1; i < sumsLen; i++) {
+      sums[i] += cSum;
+      cSum = sums[i];
+    }
+    scan_final<<< numBlocks, BLOCK_SIZE*RANGE >>>(out, sums);
+    cudaDeviceSynchronize(); // remain patient
+    
+    const auto end{std::chrono::steady_clock::now()};
+    const std::chrono::duration<double> elapsed{end - start};
+    std::cout << elapsed.count() << "\n";
+  }
+  
   // do the scan
-  int numBlocks = (SIZE + BLOCK_SIZE*RANGE - 1) / (BLOCK_SIZE*RANGE);
   scan_range<<< numBlocks, BLOCK_SIZE >>>(in, out, sums);
   cudaDeviceSynchronize(); // patience, girls
 
@@ -65,9 +86,8 @@ int main() {
   // check results
   for (int i = 0; i < SIZE; i++) {
     int ans = i+1;
-    out[i] == ans ? printf("%d ", out[i]) : printf("\n  IDX: %d   OUT: %d   EXP: %d\n", i, out[i], ans);
+    if (out[i] != ans) { std::cerr << "IDX: " << i << "   OUT: " << out[i] << "   EXP: " << ans << std::endl; }
   }
-  printf("\n");
 
   // free mem
   cudaFree(in);
