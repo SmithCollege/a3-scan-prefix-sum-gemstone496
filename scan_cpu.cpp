@@ -3,10 +3,12 @@
 #include <chrono>
 #include <iostream>
 
-#define SIZE 2048
+#define SIZE 16384
 #define RUNS 100
 
 int main() {
+  std::cout << "\n" << SIZE;
+  
   // allocate memory
   int* input = (int*) (malloc(sizeof(int) * SIZE));
   int* output = (int*) (malloc(sizeof(int) * SIZE));
@@ -28,7 +30,7 @@ int main() {
     
     const auto end{std::chrono::steady_clock::now()};
     const std::chrono::duration<double> elapsed{end - start};
-    std::cout << elapsed.count() << "\n";
+    std::cout << "," << elapsed.count();
   }
 
   // check results

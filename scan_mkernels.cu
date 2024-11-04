@@ -3,9 +3,9 @@
 #include <chrono>
 #include <iostream>
 
-#define SIZE 2048
+#define SIZE 16384
 #define BLOCK_SIZE 128
-#define RANGE 16
+#define RANGE 8
 #define RUNS 100
 
 // function to calculate the scan on GPU
@@ -21,8 +21,7 @@ __global__ void scan_range(int *in, int *out, int *sums){
   }
 
   int sumsLen = (SIZE+RANGE-1)/RANGE; // length of sums, so we don't edit oob
-  ++gindex < sumsLen ? sums[gindex] += sum : sums[gindex] = 0; // it's ok it'll work i pwomise
-    //printf("idx: %d   sum: %d   \n", gindex, sum);
+  if (gindex+1 < sumsLen) { sums[gindex+1] += sum; } // it's ok it'll work i pwomise
     //for (++gindex; gindex < sumsLen; gindex++){
     //sums[gindex] += sum;
     //}
@@ -36,9 +35,11 @@ __global__ void scan_final(int *out, int *sums){
 }
 
 int main() {
+  std::cout << "\n" << SIZE;
+  
   // allocate input and output arrays
   int sumsLen = (SIZE+RANGE-1)/RANGE; //ceiling of SIZE/RANGE
-  int numBlocks = (SIZE + BLOCK_SIZE*RANGE - 1) / (BLOCK_SIZE*RANGE);
+  int numBlocks = (sumsLen+BLOCK_SIZE-1) / BLOCK_SIZE;
   int *in; cudaMallocManaged(&in, SIZE*sizeof(int)); //these belong on the same lines bc they're var assignment:
   int *out; cudaMallocManaged(&out, SIZE*sizeof(int)); //on a technicality, the statements must be separated.
   int *sums; cudaMallocManaged(&sums, sumsLen*sizeof(int));
@@ -53,9 +54,17 @@ int main() {
   }
 
   for (int i = 0; i < RUNS; i++) {
-    int cSum = 0;
-    const auto start{std::chrono::steady_clock::now()};
+    // initialize inputs
+    for (int j = 0; j < SIZE; j++) {
+      in[j] = 1;
+    }
+    for (int j = 0; j < sumsLen; j++) {
+      sums[j] = 0;
+    }
     
+    const auto start{std::chrono::steady_clock::now()};
+
+    int cSum = 0;
     scan_range<<< numBlocks, BLOCK_SIZE >>>(in, out, sums);
     cudaDeviceSynchronize(); // patience, girls
     for (int i = 1; i < sumsLen; i++) {
@@ -67,22 +76,9 @@ int main() {
     
     const auto end{std::chrono::steady_clock::now()};
     const std::chrono::duration<double> elapsed{end - start};
-    std::cout << elapsed.count() << "\n";
+    std::cout << "," << elapsed.count();
   }
   
-  // do the scan
-  scan_range<<< numBlocks, BLOCK_SIZE >>>(in, out, sums);
-  cudaDeviceSynchronize(); // patience, girls
-
-  int cSum = 0;
-  for (int i = 1; i < sumsLen; i++) {
-    sums[i] += cSum;
-    cSum = sums[i];
-  }
-  
-  scan_final<<< numBlocks, BLOCK_SIZE*RANGE >>>(out, sums);
-  cudaDeviceSynchronize(); // remain patient
-
   // check results
   for (int i = 0; i < SIZE; i++) {
     int ans = i+1;
