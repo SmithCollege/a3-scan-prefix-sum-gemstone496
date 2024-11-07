@@ -1,6 +1,7 @@
 # Import seaborn
 import seaborn as sns
 import pandas as pd
+import matplotlib.pyplot as plt
 
 # Apply default theme
 sns.set_theme()
@@ -16,15 +17,20 @@ cpuTime = cpuTime.transpose().rename(columns={2048: 'cpu2048', 4096: 'cpu4096', 
 naiveTime = naiveTime.transpose().rename(columns={2048: 'naive2048', 4096: 'naive4096', 16384: 'naive16384'})
 mkTime = mkTime.transpose().rename(columns={2048: 'mk2048', 4096: 'mk4096', 16384: 'mk16384'})
 
-# Join and pivot
-data = cpuTime.join(naiveTime, lsuffix='cpu', rsuffix='naive').join(mkTime, rsuffix='mk')
-data['run'] = data.index
+# Join
+times = cpuTime.join(naiveTime, lsuffix='cpu', rsuffix='naive').join(mkTime, rsuffix='mk')
+times['run'] = times.index # turn this back into a proper row
 
-data = pd.wide_to_long(data, ['cpu', 'naive', 'mk'], i='run', j='size')
-data = data.reset_index()
+# Pull out size through a wide-long pivot
+times = pd.wide_to_long(times, ['cpu', 'naive', 'mk'], i='run', j='size')
+times = times.reset_index() # turn back to a proper row
 
-print(data)
+# Pull out method through a melting pivot
+times  = pd.melt(times, id_vars=['run', 'size'], var_name='method', value_name='time').reset_index()
 
-data = pd.melt(data, id_vars=['run', 'size'], var_name='method', value_name='time')
 
-print(data)
+# Create graph
+plot = sns.lmplot(data=times, x='size', y='time', hue='method')
+
+# Export graph
+plt.savefig("timers.png")
